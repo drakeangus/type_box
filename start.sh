@@ -13,10 +13,12 @@ game_text_file="${game_files}/game_text.txt"
 
 # get player ip so they don't have to enter a name each time they play
 ip_regex='^.*\((.*)\)$'
-[[ $(who am i) =~ $ip_regex ]] && ip=${BASH_REMATCH[1]}
+whomst=$(who am i)
+#[[ -z $whomst ]] && whomst=
+[[ $whomst =~ $ip_regex ]] && ip=${BASH_REMATCH[1]} || ip='not found'
 
 # if the player doesn't exist in the player_file ask for a name
-name=$(grep $ip $player_file | awk -F ',' '{print $1}')
+name=$(grep "$ip" $player_file | awk -F ',' '{print $1}')
 if [[ -z $name ]]; then
     read -p "What's your name? " name 
     echo ${name}, ${ip} >> $player_file
