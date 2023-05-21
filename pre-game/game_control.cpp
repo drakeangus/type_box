@@ -56,7 +56,7 @@ void printReadyUp()
                                                                                                                                                .   .:!5@@@!                                                                               ~JJ:                            
                                                                                                                                               5##GB#@@@@G7                                                                                                                
                                                                                                                                               Y####BPJ?^                                                                                                                  
-\n)";
+)";
 }
 
 
@@ -69,7 +69,7 @@ void moveCursorUp(int rows)
 }
 
 
-void printStatus(bool skipClearLine = false)
+bool printStatus(bool skipClearLine = false)
 {
     std::string path = ".players";
     string file_name;
@@ -120,13 +120,28 @@ void printStatus(bool skipClearLine = false)
             cout << "ERROR - cannot read file" << endl;    
         }    
     }
-    //printf("%c[%d;%df",0x1B,row,line_pos)
-    cout << "Player count: " << player_count <<endl;
-    moveCursorUp(player_count + 1); // plus 1 for the line above
 
+    if (allPass)
+    {
+        return true;
+    }
+
+    cout << endl;
+    moveCursorUp(player_count + 1); // plus 1 for the line above
+    return false;
 }
 
-bool getUserInput()    
+void updatePlayerFile(string& player_name, string& player_num)
+{
+    string filename = ".players/player_" + player_num;
+    string contents = "true, " + player_name;
+    std::ofstream myfile;    
+    myfile.open (filename, std::ios::trunc); // open and empty file    
+    myfile << contents << endl; 
+    myfile.close();
+}
+
+bool getUserInput(string& player_name, string& player_num)    
 {    
     std::string userInput;    
     bool skip = false;    
@@ -147,7 +162,6 @@ bool getUserInput()
     if (ready == -1) {    
         //std::cout << "Error in select." << std::endl;    
         return false;    
-    getUserInput();    
     }    
     else if (ready == 0) {    
         //std::cout << "Time limit exceeded. Skipping..." << std::endl;    
@@ -161,6 +175,8 @@ bool getUserInput()
     if (!skip) {    
         //std::cout << "User input: " << userInput << std::endl;    
         // Further processing or actions based on user input    
+
+        updatePlayerFile(player_name, player_num);
     }    
 return true;    
 }
@@ -176,28 +192,31 @@ int main(int argc, char *argv[]){
    printReadyUp();
  
 cout << endl;
-    moveCursorUp(35);
+    moveCursorUp(38);
 
-    cout << player_name << " " << player_num << endl;
 
     bool skipClearLine = true;
-    while (!getUserInput())
+    while (!getUserInput(player_name, player_num))
     {
         printStatus(skipClearLine);
         std::this_thread::sleep_for(500ms);
     }
 
-    cout << "Hit enter to ready up" << endl;
-    std::string input;    
-    std::getline(std::cin, input);    
+    system("clear");     
 
-   system("clear");     
-
+    cout << "The game will start when all players are ready." << endl;
+    bool allPlayersReady;
     while (true)
     {
-        printStatus();
+        allPlayersReady = printStatus();
+        if (allPlayersReady)
+        {
+            break;
+        }
         std::this_thread::sleep_for(500ms);
     }
 
+    system("clear");
+    cout << "ITS TIME" << endl;
     return 0;  
 }

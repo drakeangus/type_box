@@ -4,6 +4,10 @@ name="$@"
 
 [[ -z $name ]] && echo must give name as argument && exit
 
+# if game_control doesnt exist create it
+game_control_file="game_control"
+[[ -f $game_control_file ]] || echo 0 > game_control
+
 countdown()
 {
 echo Game Starting in...    
@@ -100,10 +104,23 @@ printf "false, $name\n" > $player_file
 
 
 
-./game_control.exe $name $num 
+./game_control.exe "$name" "$num" 
 
-while [ "$(cat game_control)" != true ]; do
-    sleep 0.1
+echo "DEBUG - back to the bash script" 
+
+# when each player exits the game control script they will increment the number in the game_control file
+# once the number hits the number of players the game begins
+
+players=$(grep -l 'true, ' .players/* | wc -l)
+
+game_control_num=$(cat game_control)
+
+((game_control_num++))
+
+echo $game_control_num > game_control
+
+while [[ "$(cat game_control)" -le "$number_of_players" ]]; do
+    sleep 0.01
 done    
 
 countdown
@@ -112,7 +129,13 @@ countdown
 
 echo GAME START
 
+clear
+cd .. # need to fix this 
+./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')"
+cd pre-game # need to fix this
+
 echo GAME OVER
 
 #reset for next game
+echo 0 > game_control
 rm -f $player_directory/player_*

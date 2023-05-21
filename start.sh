@@ -43,7 +43,7 @@ echo ${strings[$random_index]} > $game_text_file
 
 
 
-
+: '
 
 read -p "Hit the enter key when you are ready to start"
 
@@ -56,6 +56,10 @@ while [[ $count > 0 ]]; do
 done
 
 clear
+'
 
-./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')"
+cd pre-game
+./start_game.sh "$name"
+
+# ./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')"
     
