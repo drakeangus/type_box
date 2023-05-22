@@ -35,11 +35,20 @@ strings=(
     "The oldest known living tree is a bristlecone pine named Methuselah in California it is estimated to be almost five thousand years old"
     "The longest recorded flight of a chicken is thirteen seconds"
     "The largest pyramid in the world is not in Egypt but in Cholula Mexico. The Great Pyramid of Cholula is the largest by volume and covers an area of over 16 hectares"    
-)    
-    
-array_length=${#strings[@]}    
+)
+
+strings2=(
+"Dolphins are intelligent and sociable marine mammals known for their playful behavior and complex communication skills."
+"The Great Wall of China stretches for thousands of kilometers, serving as a historic defensive fortification."
+"The Eiffel Tower, an iconic landmark in Paris, attracts millions of visitors with its impressive architectural design."
+"Bees are essential pollinators, playing a crucial role in the reproduction of many plant species."
+"The Amazon rainforest covers vast areas of South America and is renowned as the world's largest tropical rainforest."
+"Mount Everest, located in the Himalayas, stands as the highest peak on Earth, captivating adventurers and mountaineers."
+"The Mona Lisa, created by Leonardo da Vinci, is an invaluable and renowned masterpiece in the world of art."
+)
+array_length=${#strings2[@]}    
 random_index=$((RANDOM % array_length))    
-echo ${strings[$random_index]} > $game_text_file
+echo ${strings2[$random_index]} > $game_text_file
 
 
 

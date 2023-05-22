@@ -1,4 +1,5 @@
 #include <string>
+#include <vector>
 #include <iostream>    
 #include <filesystem>
 #include <fstream>
@@ -15,7 +16,17 @@
 
 namespace fs = std::filesystem;    
 using namespace std;    
- 
+
+struct Colours
+{
+    string green = "\033[0;32m", italic_green = "\033[3;32m",
+           red = "\033[0;31m", italic_red = "\033[3;31m",
+           yellow = "\033[0;33m", bold_yellow = "\033[1;33m", italic_yellow = "\033[3;33m",
+           blue = "\033[0;34m",
+           magenta = "\033[0;35m",
+           cyan = "\033[0;36m",
+           italic_grey = "\033[3;90m", reset = "\033[0m";
+};
 
 void printReadyUp()
 {
@@ -62,31 +73,101 @@ void printReadyUp()
 
 void moveCursorUp(int rows)
 {
-    for (int i; i < rows; i++)
+    for (int i=0; i < rows; i++)
     {
         cout << "\x1b[A";
     }
 }
 
+struct Box : public Colours    
+{    
+    
+    string selectedColour;    
+    
+    int width;    
+    int height;    
+    
+    int line_count = 0;    
+    
+    void drawHorizontal(std::string first, std::string last)    
+    {    
+        for (int i=0; i <= width; i++)    
+        {    
+            if (i==0)    
+            {    
+                cout << selectedColour << first; // eg "╭";    
+            }    
+            else if (i == width)    
+            {    
+                cout << last << reset << endl; // eg "╮"     
+            }    
+            else    
+            {    
+                cout << "─";    
+            }    
+        }    
+    }
+
+
+    void setBoxColour(std::string colour)
+    {
+        selectedColour = colour;
+    }
+
+    void printToBox(vector<std::string> strings, std::string colour = "\033[0m" ) // reset colour = "\033[0m"
+    {
+        setBoxColour(colour);
+        // find the length of the longest string
+        size_t maxLength = 0;
+
+        for (const std::string& str : strings)
+        {
+            if (str.length() > maxLength)
+            {
+                maxLength = str.length()+1;
+            }
+        }
+
+        width = maxLength;
+        drawHorizontal("╭","╮");
+
+        int whiteSpace;
+        for (const std::string& str : strings)
+        {
+            for (int j=0; j <= width-1; j++)
+            {
+                cout << " ";
+            }
+            // first draw the right edge of the box
+            cout << selectedColour << "│";
+           // then go to the start of the line and draw the content
+            cout << "\r│" << reset << str << endl;
+        }
+        drawHorizontal("╰","╯");
+    }
+
+};
 
 bool printStatus(bool skipClearLine = false)
 {
+    Colours colour;
+    Box statusBox;
+
     std::string path = ".players";
     string file_name;
     int  player_count = 0;
-    
     bool allPass = true;
 
+    std::vector<std::string> allPlayerStatus = {" The game will start when all players are ready "};
+    //allPlayerStatus.clear(); // make sure the vector is empty
     for (const auto & entry : fs::directory_iterator(path))
     {
+
         player_count++;
-        //file_name = entry.path();
-        //std::cout << entry.path() << std::endl;
-        //std::cout << file_name << std::endl;
 
         std::ifstream file(entry.path());      
 
-        string ready_state, name;
+        string ready_state, name, player_status; 
         if (file.is_open())    
         {    
             std::stringstream buffer;    
@@ -106,14 +187,16 @@ bool printStatus(bool skipClearLine = false)
             
             if (ready_state == "true")
             {
-                cout << "✅";
+                player_status = "✅ ";
             }
             else
             {
-                cout << "❌";
+                player_status = "❌ ";
                 allPass = false;
             }
-            cout << " " << name;    
+            player_status += name;  
+
+            allPlayerStatus.push_back(" "+player_status+" ");
         }    
         else    
         {    
@@ -121,13 +204,16 @@ bool printStatus(bool skipClearLine = false)
         }    
     }
 
+      statusBox.printToBox(allPlayerStatus, colour.blue);
+
     if (allPass)
     {
         return true;
     }
 
-    cout << endl;
-    moveCursorUp(player_count + 1); // plus 1 for the line above
+    //cout << "debgu message " <<  endl;
+    //moveCursorUp(player_count + 1); // plus 1 for the line above
+    moveCursorUp(allPlayerStatus.size()  + 2); // plus 1 for the line above, plus 2 for the top and bottom of the box
     return false;
 }
 
@@ -137,7 +223,7 @@ void updatePlayerFile(string& player_name, string& player_num)
     string contents = "true, " + player_name;
     std::ofstream myfile;    
     myfile.open (filename, std::ios::trunc); // open and empty file    
-    myfile << contents << endl; 
+    myfile << contents; //its important there is no newline character at the end of this 
     myfile.close();
 }
 
@@ -191,7 +277,7 @@ int main(int argc, char *argv[]){
 
    printReadyUp();
  
-cout << endl;
+   cout << endl;
     moveCursorUp(38);
 
 
@@ -204,7 +290,7 @@ cout << endl;
 
     system("clear");     
 
-    cout << "The game will start when all players are ready." << endl;
+    //cout << "The game will start when all players are ready." << endl;
     bool allPlayersReady;
     while (true)
     {

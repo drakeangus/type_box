@@ -94,22 +94,14 @@ player_file="$player_directory/player_${num}"
 
 echo $name = player_$num
 
-#printf "unready\n$name\n" > $player_file
-printf "false, $name\n" > $player_file
-
-
-#read -p "Hit enter when you are ready play."
-
-#printf "true, $name\n" > $player_file
-
+printf "false, $name" > $player_file # its important this file has no newline character
 
 
 ./game_control.exe "$name" "$num" 
 
-echo "DEBUG - back to the bash script" 
 
 # when each player exits the game control script they will increment the number in the game_control file
-# once the number hits the number of players the game begins
+# once the number hits the total number of players the game will begin
 
 players=$(grep -l 'true, ' .players/* | wc -l)
 
@@ -130,11 +122,13 @@ countdown
 echo GAME START
 
 clear
+
+
 cd .. # need to fix this 
-./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')"
+./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')" "$num"
 cd pre-game # need to fix this
 
-echo GAME OVER
+echo [ DEBUG ] - back to start_game.sh - resetting game files
 
 #reset for next game
 echo 0 > game_control

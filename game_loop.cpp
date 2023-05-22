@@ -20,10 +20,27 @@ using std::chrono::milliseconds;
 
 namespace Files
 {
-    string outputFile = ".game_files/output.txt";
+    //string outputFile = ".game_files/output.txt";
+    string outputFile; // This needs to be unique per player
     string inputFile = ".game_files/game_text.txt";
     string scores = ".game_files/scores.csv";
 }
+
+
+struct Colours
+{
+    string green = "\033[0;32m", italic_green = "\033[3;32m", 
+           red = "\033[0;31m", italic_red = "\033[3;31m", 
+           yellow = "\033[0;33m", bold_yellow = "\033[1;33m", italic_yellow = "\033[3;33m",
+           blue = "\033[0;34m", 
+           magenta = "\033[0;35m", 
+           cyan = "\033[0;36m", 
+           italic_grey = "\033[3;90m", reset = "\033[0m",
+           
+            target_text_colour = italic_grey;
+};
+
+
 class Getchar {
 private:
     termios   oldterm;
@@ -64,18 +81,17 @@ char Getchar::getch_(bool echo)
   return ch;
 }
 
-struct Text
+struct Text : public Colours
 {
     string text;
-
     string userInput;
-
     string playerName;
     string date;
+    string playerNumber;
 
     void print_text()
     {
-        cout << text;
+        cout << target_text_colour << text << reset;
     }
 
     int size()
@@ -109,7 +125,7 @@ class Game
         }
 };
 
-class CursorPosition
+class CursorPosition : public Colours
 {
     public :
         int line_pos;
@@ -140,7 +156,7 @@ class CursorPosition
             printf("%c[%d;%df", 0x1B, typedRow, position+1);
         }
 
-        void delete_character()
+        void delete_character(char replace_character)
         {
             // This janky -1 / +1 lets us do multiple deletes on a row
 
@@ -151,7 +167,7 @@ class CursorPosition
             printf("%c[%d;%df",0x1B,row,line_pos+1);
             
             // replace the character with a new one
-            cout << " ";
+            cout << target_text_colour << replace_character;
             
             // move back over the character we replaced
             printf("%c[%d;%df",0x1B,row,line_pos+1);
@@ -159,10 +175,14 @@ class CursorPosition
         }
 };
 
-struct Colours
+
+
+double CalculateWordsPerMinuite(int numberOfLetters, double seconds)
 {
-    string green = "\033[0;32m", italic_green = "\033[3;32m", red = "\033[0;31m", italic_red = "\033[3;31m", yellow = "\033[0;33m", blue = "\033[0;34m", magenta = "\033[0;35m", cyan = "\033[0;36m", italic_grey = "\033[3;90m", reset = "\033[0m";
-};
+    double minutes = seconds / 60;
+    double words = numberOfLetters / 5;
+    return words / minutes;
+}
 
 std::string detectKeyPress(Game& game, CursorPosition& position, Text& textObj)
 {
@@ -186,6 +206,8 @@ std::string detectKeyPress(Game& game, CursorPosition& position, Text& textObj)
 
     game.state = true;
 
+   auto live_t1 = high_resolution_clock::now(); // outside while loop with t2 inside - Every itteration we'll calculate the new wpm
+
   while (game.state) {
 
     
@@ -193,15 +215,14 @@ std::string detectKeyPress(Game& game, CursorPosition& position, Text& textObj)
     ch = mygch.getch();
     int_ch = (int)ch;
     
-    //if (int_ch == 127 && !lastCharCorrect ) //delete character
+    //if (int_ch == 127 && !lastCharCorrect ) // cannot delete correct characters
     if (int_ch == 127) //delete character
     {
 
-        //content = content.substr(0, content.size()-2); //remove last character
         content = content.substr(0, content.size()-1); //remove last character
 
         character_count--;
-        position.delete_character(); 
+        position.delete_character(textObj.text[content.size()]); 
 
         myfile.open(Files::outputFile);
         myfile << content;
@@ -227,52 +248,42 @@ std::string detectKeyPress(Game& game, CursorPosition& position, Text& textObj)
         //position.line_pos++;
         position.line_pos = content.size();
 
-        //if (textObj.text[character_count-1] == ch)
-        if (textObj.text[content.size()-1] == ch)
+
+        if (textObj.text[content.size()-1] == ch) // correct input character
         {
             lastCharCorrect = true;
             cout << colour.green << ch << colour.reset;
-
-            /* 
-            // print if correct character
-            position.newline();
-            cout << colour.italic_green << "Correct character  " << colour.reset;
-            position.toTypeRowEnd(character_count);
-            */
         }
-        else
+        else  // incorrect input character
         {
             lastCharCorrect = false;
             cout << colour.red << ch << colour.reset;
-            
-            /*
-            // print if incorrect character
-            position.newline();
-            cout << colour.italic_red << "Incorrect character" << colour.reset;
-            position.toTypeRowEnd(character_count);
-            */
-
         }
         
+        auto live_t2 = high_resolution_clock::now();
+    
+        // print live wpm every key press    
+        auto ms_int = duration_cast<milliseconds>(live_t2 - live_t1);  
+        double timeTaken_seconds = (double)ms_int.count()/1000;
+
+        double wpm = CalculateWordsPerMinuite(character_count, timeTaken_seconds); 
+            
+        position.newline();
+        cout << colour.italic_yellow << wpm << colour.reset;
+        position.toTypeRowEnd(character_count);
 
         
         if (character_count == textObj.size())
         {
             game.state = false;
         }
+   
     } 
-    
-  
   } //while
-    return content;
+ 
+  return content;
 } // detectKeyPress()
 
-double CalculateWordsPerMinuite(int numberOfLetters, double seconds)
-{
-    double minutes = seconds / 60;
-    double words = numberOfLetters / 5;
-    return words / minutes;
-}
 
 std::string ReadInputFile()
 {
@@ -321,46 +332,50 @@ int main( int argc,      // Number of strings in array argv
 {
 
 
-
+    Game game;
+    Colours colour;
+    CursorPosition position;
     Text textObj;
 
-    //GetPlayerNameAndTime(textObj);
     
-            //textObj.playerName = "John Doe" ;
-            //textObj.date = "1997-01-01 00:00:00";
-            textObj.playerName = argv[1] ;
-            textObj.date = argv[2];
+    textObj.playerName = argv[1] ;
+    textObj.date = argv[2];
+    textObj.playerNumber = argv[3];
 
-    Game game;
-    //game.clear_screen();
+    // seperate output files for each player
+    Files::outputFile = ".game_files/output_" + textObj.playerNumber;
 
-    Colours colour;
-
-    CursorPosition position;
     position.line_pos = 0;
     
+    //OVERLAP TEXT - change 1 - we also need to fix deletes
     
-    textObj.text = ReadInputFile();
-
-    // print game text
-    textObj.print_text();
-    position.newline(2);
-
-
+    // save the position of the typed row
     position.typedRow = position.row;
 
+    // print game text from input file
+    textObj.text = ReadInputFile();
+    textObj.print_text();
+  
+    position.toTypeRowEnd(-1);
+  
+    //position.newline(2);
+   
 
+
+    // ----------MAIN -----------
     // start timer at t1
     auto t1 = high_resolution_clock::now();
 
     // Main game loop
     textObj.userInput = detectKeyPress(game, position, textObj);
     
-
     // stop timer at t2
     auto t2 = high_resolution_clock::now();
 
-    /* Getting number of milliseconds as an integer. */    
+    // --------------------------
+
+
+    // getting number of milliseconds as an integer between t2 and t1    
     auto ms_int = duration_cast<milliseconds>(t2 - t1);  
     double timeTaken_seconds = (double)ms_int.count()/1000;
 
@@ -376,6 +391,7 @@ int main( int argc,      // Number of strings in array argv
     myfile << textObj.playerName << "," << textObj.date << "," << wpm << "," << timeTaken_seconds << "," << textObj.UserInputMistakeCount() << endl;;
     myfile.close();
 
+    /*
     cout << "Name: " << textObj.playerName << endl;
     cout << "Date: " << textObj.date << endl;
     cout << "Mistakes: " << textObj.UserInputMistakeCount() << endl; 
@@ -383,7 +399,7 @@ int main( int argc,      // Number of strings in array argv
     cout << "Time taken: " << timeTaken_seconds  << "s" << endl;
  
     cout << "WPM: " << wpm << endl;
-
+    */
 
   return 0;
 }
