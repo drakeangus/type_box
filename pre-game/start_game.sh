@@ -61,6 +61,7 @@ printf '
                                                                                                                                                                                                                                .:.
 \n'
 
+sleep 1
 
 player_directory=".players"
 [[ -d $player_directroy ]] && mkdir $player_directory
@@ -81,9 +82,9 @@ if [[ -n "$(\ls -A $player_directory)" ]]; then
 else
     num=1
 
-    read -p "Wait for other players? [y]/n: " input
+#    read -p "Wait for other players? [y]/n: " input
     
-    [[ $input == "n" || $input == "N" ]] && single_player=true
+#    [[ $input == "n" || $input == "N" ]] && single_player=true
 
     
 fi
@@ -112,7 +113,11 @@ game_control_num=$(cat game_control)
 echo $game_control_num > game_control
 
 while [[ "$(cat game_control)" -le "$number_of_players" ]]; do
-    sleep 0.01
+#inotifywait -m -q -e modify game_control | while read -r; do
+#    if [[  "$(cat game_control)" -ge "$number_of_players" ]]; then
+#        break;
+#    fi
+    continue
 done    
 
 countdown

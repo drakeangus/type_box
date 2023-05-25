@@ -19,6 +19,9 @@ whomst=$(who am i)
 
 # if the player doesn't exist in the player_file ask for a name
 name=$(grep "$ip" $player_file | awk -F ',' '{print $1}')
+
+[[ -z $1 ]] || name="$1"
+
 if [[ -z $name ]]; then
     read -p "What's your name? " name 
     echo ${name}, ${ip} >> $player_file

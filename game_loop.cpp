@@ -1,181 +1,4 @@
-#include <iomanip>
-#include <cstdio>
-#include <cstring>
-#include <termios.h>
-#include <unistd.h>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <chrono>
-
-using namespace std;
-
-// to simplify the timer
-using std::chrono::high_resolution_clock;
-using std::chrono::duration_cast;
-using std::chrono::duration;
-using std::chrono::milliseconds;
-
-
-namespace Files
-{
-    //string outputFile = ".game_files/output.txt";
-    string outputFile; // This needs to be unique per player
-    string inputFile = ".game_files/game_text.txt";
-    string scores = ".game_files/scores.csv";
-}
-
-
-struct Colours
-{
-    string green = "\033[0;32m", italic_green = "\033[3;32m", 
-           red = "\033[0;31m", italic_red = "\033[3;31m", 
-           yellow = "\033[0;33m", bold_yellow = "\033[1;33m", italic_yellow = "\033[3;33m",
-           blue = "\033[0;34m", 
-           magenta = "\033[0;35m", 
-           cyan = "\033[0;36m", 
-           italic_grey = "\033[3;90m", reset = "\033[0m",
-           
-            target_text_colour = italic_grey;
-};
-
-
-class Getchar {
-private:
-    termios   oldterm;
-    termios   newterm;
-    char getch_(bool echo);
-public:
-    char getch(void);
-    void initTermios(bool echo);
-    void resetTermios(void);
-};
-
-char Getchar::getch(void)
-{
-  return getch_(false);
-}
-
-void Getchar::initTermios(bool echo)
-{
-  tcgetattr(0, &oldterm); //grab old terminal i/o settings
-  newterm = oldterm; //make new settings same as old settings
-  newterm.c_lflag &= ~ICANON; //disable buffered i/o
-  newterm.c_lflag &= echo ? ECHO : ~ECHO; //set echo mode
-  tcsetattr(0, TCSANOW, &newterm); //apply terminal io settings
-}
-
-/* Restore old terminal i/o settings */
-void Getchar::resetTermios(void)
-{
-  tcsetattr(0, TCSANOW, &oldterm);
-}
-
-char Getchar::getch_(bool echo)
-{
-  char ch;
-  initTermios(echo);
-  ch = getchar();
-  resetTermios();
-  return ch;
-}
-
-struct Text : public Colours
-{
-    string text;
-    string userInput;
-    string playerName;
-    string date;
-    string playerNumber;
-
-    void print_text()
-    {
-        cout << target_text_colour << text << reset;
-    }
-
-    int size()
-    {
-        return text.size();
-    }
-
-    int UserInputMistakeCount()
-    {
-        int mistakeCount = 0;
-        for (int i=0; i < text.size(); i++)
-        {
-            if (text[i] != userInput[i])
-            {
-                mistakeCount++;
-            }
-        }
-        return mistakeCount;
-    }
-};
-
-class Game
-{
-    public :
-
-        bool state;
-
-        void clear_screen(void)    
-        {    
-            system("clear");    
-        }
-};
-
-class CursorPosition : public Colours
-{
-    public :
-        int line_pos;
-        int row=1;
-
-        int last_x, last_y;
-
-        int typedRow;
-
-        void newline(int num = 1)
-        {
-            last_x = line_pos;
-            last_y = row;
-
-            row += num;
-            line_pos = 0;
-            printf("%c[%d;%df",0x1B,row,line_pos);
-        }
-
-        void toTypeRowEnd(int position)
-        {
-            last_x = line_pos;
-            last_y = row;
-
-            line_pos = position;
-            row = typedRow;
-
-            printf("%c[%d;%df", 0x1B, typedRow, position+1);
-        }
-
-        void delete_character(char replace_character)
-        {
-            // This janky -1 / +1 lets us do multiple deletes on a row
-
-            // In order to delete a character we need to decrease the line position OF THE LAST NON DEL CHARACTER by 1
-            line_pos--;
-            
-            // move the cursor position to one space after that
-            printf("%c[%d;%df",0x1B,row,line_pos+1);
-            
-            // replace the character with a new one
-            cout << target_text_colour << replace_character;
-            
-            // move back over the character we replaced
-            printf("%c[%d;%df",0x1B,row,line_pos+1);
-            
-        }
-};
-
-
+#include "game_loop.h"
 
 double CalculateWordsPerMinuite(int numberOfLetters, double seconds)
 {
@@ -184,105 +7,8 @@ double CalculateWordsPerMinuite(int numberOfLetters, double seconds)
     return words / minutes;
 }
 
-std::string detectKeyPress(Game& game, CursorPosition& position, Text& textObj)
-{
-
-    Colours colour;
-    
-    bool lastCharCorrect;
-
-    Getchar mygch;
-    char ch;
-    int int_ch;
-    int escape_ch = 7;
-
-    int character_count=0; 
-
-    std::string content ="";
-
-    std::ofstream myfile;
-    myfile.open (Files::outputFile, std::ios::trunc); // open and empty file
-    myfile.close();
-
-    game.state = true;
-
-   auto live_t1 = high_resolution_clock::now(); // outside while loop with t2 inside - Every itteration we'll calculate the new wpm
-
-  while (game.state) {
-
-    
-     // get single  key press
-    ch = mygch.getch();
-    int_ch = (int)ch;
-    
-    //if (int_ch == 127 && !lastCharCorrect ) // cannot delete correct characters
-    if (int_ch == 127) //delete character
-    {
-
-        content = content.substr(0, content.size()-1); //remove last character
-
-        character_count--;
-        position.delete_character(textObj.text[content.size()]); 
-
-        myfile.open(Files::outputFile);
-        myfile << content;
-        myfile.close();
-    }
-
-    if (int_ch == 7) // escape character
-    {
-        cout << "escape" << endl;
-        return "";
-    }
-
-    //if (int_ch != 7 || int_ch != 127) //ie not ESC or delete
-    if (int_ch != 127) //ie not ESC or delete
-    {
-        myfile.open (Files::outputFile, std::ios::app);
-        myfile << ch;
-        myfile.close();
-        
-        content += ch;
-        
-        character_count++;
-        //position.line_pos++;
-        position.line_pos = content.size();
-
-
-        if (textObj.text[content.size()-1] == ch) // correct input character
-        {
-            lastCharCorrect = true;
-            cout << colour.green << ch << colour.reset;
-        }
-        else  // incorrect input character
-        {
-            lastCharCorrect = false;
-            cout << colour.red << ch << colour.reset;
-        }
-        
-        auto live_t2 = high_resolution_clock::now();
-    
-        // print live wpm every key press    
-        auto ms_int = duration_cast<milliseconds>(live_t2 - live_t1);  
-        double timeTaken_seconds = (double)ms_int.count()/1000;
-
-        double wpm = CalculateWordsPerMinuite(character_count, timeTaken_seconds); 
-            
-        position.newline();
-        cout << colour.italic_yellow << wpm << colour.reset;
-        position.toTypeRowEnd(character_count);
-
-        
-        if (character_count == textObj.size())
-        {
-            game.state = false;
-        }
-   
-    } 
-  } //while
- 
-  return content;
-} // detectKeyPress()
+mutex mtx;
+int cursorPosX;
 
 
 std::string ReadInputFile()
@@ -326,80 +52,392 @@ void GetPlayerNameAndTime(Text& textObj)
 
 }
 
+string getPlayerName(string number)
+{
+
+    string file_name = "pre-game/.players/player_" + number;
+
+    std::ifstream file(file_name);
+    if (file.is_open())
+    {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string fileContent = buffer.str();
+        file.close();
+
+        size_t pos = fileContent.find(", ");
+        return fileContent.substr(pos+2);
+    }
+    else
+        return "Uknown Player";
+}
+
+vector <string> getOtherPlayerText(int player_number)
+{
+
+    Colours colour;
+    std::string path = ".game_files/output_files";
+    string file_name;
+    //int  player_count = 0;
+
+    std::vector<std::string> playerText = {};
+    //allPlayerStatus.clear(); // make sure the vector is empty
+    for (const auto & entry : fs::directory_iterator(path))
+    {
+        file_name = entry.path().filename().string();
+        
+        size_t pos = file_name.find("_");
+        string other_player_number = file_name.substr(pos+1);
+
+        if (file_name == "output_"+to_string(player_number)) // we don't want to print for the player running the script
+        {
+            continue;
+        }
+        string player_name = getPlayerName(other_player_number);  // THIS SHOULD NOT BE DONE HERE. THIS PART WILL BE LOOPED ALOT AND WE ONLY NEED TO DO THIS ONCE
+
+        std::ifstream file(entry.path());
+
+        string ready_state, name, player_status;
+        if (file.is_open())
+        {
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+            std::string fileContent = buffer.str();
+            file.close();
+
+
+            playerText.push_back(" " + colour.italic_grey + player_name + colour.reset + " : ");
+            playerText.push_back(" " + fileContent + " ");
+        }
+        else
+        {
+            cout << "ERROR - cannot read file" << endl;
+        }
+    }
+
+return playerText;
+}
+
+std::atomic<bool> terminateFlag(false);
+int character_count=0;
+int playerCount;
+
+//void displayTextThread(int playerNumber, int interval, Text& textObj)
+void displayTextThread(int playerNumber, int interval, int width)
+{
+
+    Box box;    
+    Colours colour;    
+    //string counter;    
+    while (terminateFlag) {    
+        // Acquire the lock to print on the specific line    
+        unique_lock<mutex> lock(mtx);    
+        cout << "\033[" << 0 << ";0H";  // Move the cursor to the specific line    
+
+        //counter = to_string(line1_count++);    
+        vector <string> strings = getOtherPlayerText(playerNumber);    
+
+
+        // TO DO : The box should take a size as an agrument so we can draw it to the correct size
+        // also an improvement here would be to only draw the box once then just print inside
+        // use some trickery to check if its the first time drawing the box 
+        
+        //int width = textObj.text.size() + 2;
+        
+        box.printToBox(strings, width, colour.blue);    
+
+        // ** 20 is for the row number - need to fix this 
+        cout << "\033[" << (playerCount * 2) + 2 + 1 << ";" << character_count + 1  << "H" << flush; // <---------------- flush is used to immediately print to the terminal from the buffer meaning we can move the cursor, then flush        
+        lock.unlock();     
+
+        // Sleep for the specified interval    
+        this_thread::sleep_for(chrono::milliseconds(interval));    
+    } 
+return;
+}
+
+vector <string> drawPace(int characterCount, int targetCount)
+{
+    string output_front = "", output_back = "", middle_text="";
+
+    string middle_text_full= "Snail boy";
+    
+    for (int i=0; i < characterCount && i < middle_text_full.size(); i++)
+    {
+        middle_text += middle_text_full[i];
+    }
+
+ /*   for (int i=0; i<targetCount - characterCount - middle_text.size(); i++)
+    {
+        output_back +=  ".";
+    }
+    */
+
+    for (int i=middle_text_full.size(); i<characterCount; i++)
+    {
+        output_front += "_";
+
+    }
+    string output = output_front + middle_text + output_back;
+    return {output};
+    
+
+   // return {"~~~~~~~~~~~~~~~~~~~~~~~~~~ Snail Boy" + to_string(characterCount) + " " + to_string(targetCount) + " ............................."};
+}
+
+
+void printSpeed(int interval, int width)
+{
+    
+    Box box;    
+    Colours colour;    
+    //string counter;    
+    while (terminateFlag) {    
+        // Acquire the lock to print on the specific line    
+        unique_lock<mutex> lock(mtx);    
+        cout << "\033[" << 0 << ";0H";  // Move the cursor to the specific line    
+
+        //counter = to_string(line1_count++);    
+        vector <string> strings = drawPace(character_count, width - 2 );    
+
+        box.printToBox(strings, width, colour.blue);    
+
+        // ** 20 is for the row number - need to fix this 
+        cout << "\033[" << (playerCount * 2) + 2 + 1 << ";" << character_count + 1  << "H" << flush; // <---------------- flush is used to immediately print to the terminal from the buffer meaning we can move the cursor, then flush        
+        lock.unlock();     
+
+        // Sleep for the specified interval    
+        this_thread::sleep_for(chrono::milliseconds(interval));    
+    } 
+return;
+
+
+}
+
+string simpleDetectKeyPress(Text& textObj, CursorPosition& position)
+{
+
+    Colours colour;
+
+        Getchar mygch;    
+    char ch;    
+    int int_ch;    
+    
+    std::string content ="";
+
+
+std::ofstream myfile;    
+    myfile.open (Files::outputFile, std::ios::trunc); // open and empty file    
+    myfile.close(); 
+
+
+    auto live_t1 = high_resolution_clock::now(); // outside while loop with t2 inside - Every itteration we'll calculate the new wpm
+
+    while(terminateFlag)
+    {
+
+        ch = mygch.getch();
+        int_ch = (int)ch;
+
+        // Acquire the lock to print on the specific line
+        unique_lock<mutex> lock(mtx);
+
+        if (int_ch == 127) // delete character
+        {
+            character_count--; //global variable
+            content = content.substr(0, content.size()-1);
+
+            position.delete_character(textObj.text[content.size()]);
+
+            myfile.open(Files::outputFile);    
+            myfile << content;    
+            myfile.close();
+
+        }
+
+        if (int_ch == 7) // escape character    
+        {    
+            cout << "escape" << endl;    
+            return content;    
+        } 
+
+        if (int_ch != 127) // non delete
+        {
+
+            myfile.open (Files::outputFile, std::ios::app);
+            myfile << ch;
+            myfile.close();
+
+            content += ch;
+            character_count++; // global variable
+            position.line_pos = content.size();
+
+            if (textObj.text[content.size()-1] == ch) // correct input character
+            {
+                // perhaps this should be a function of its own
+                // I could move to the correct line and position from it
+                cout << colour.green << ch << colour.reset;
+            }
+            else  // incorrect input character
+            {
+                cout << colour.red << ch << colour.reset;
+            }
+
+            auto live_t2 = high_resolution_clock::now();
+
+            // print live wpm every key press
+        auto ms_int = duration_cast<milliseconds>(live_t2 - live_t1);
+        double timeTaken_seconds = (double)ms_int.count()/1000;
+
+        double wpm = CalculateWordsPerMinuite(character_count, timeTaken_seconds);
+
+        position.newline();
+        cout << colour.italic_yellow << wpm << colour.reset;
+        position.toTypeRowEnd(character_count);
+
+        
+        }
+
+        lock.unlock();
+
+        if (character_count == textObj.size())
+        {
+            terminateFlag = false;
+        }
+
+    }
+
+cout << endl << endl;
+
+    return content;
+}
+
+
+void mainGameThread()
+{
+
+    Text textObj;
+    CursorPosition position;
+    
+
+    position.line_pos = 0;
+
+    position.typedRow = (playerCount * 2) + 2 + 1 ; //two lines per player + top/bottom of the box + a space inbetween + another 2 because the previous wasn't enough
+
+
+    unique_lock<mutex> lock(mtx); // acquire the lock to print on the right line
+    position.goTo(0,position.typedRow);
+
+    // print game text from input file    
+    textObj.text = ReadInputFile();    
+    textObj.print_text();
+   
+    lock.unlock(); // unlock
+
+    // start timer at t1
+    auto t1 = high_resolution_clock::now();
+    textObj.userInput = simpleDetectKeyPress(textObj, position); 
+
+   // stop timer at t2    
+    auto t2 = high_resolution_clock::now();
+
+    auto ms_int = duration_cast<milliseconds>(t2 - t1);    
+    double timeTaken_seconds = (double)ms_int.count()/1000;    
+    
+    double wpm = CalculateWordsPerMinuite(textObj.size(), timeTaken_seconds);
+
+    std::ofstream myfile;    
+    myfile.open(Files::scores, std::ios::app);    
+    myfile << textObj.playerName << "," << textObj.date << "," << wpm << "," << timeTaken_seconds << "," << textObj.UserInputMistakeCount() << endl;
+    myfile.close();
+
+    cout << endl;
+    cout << "Name: " << textObj.playerName << endl;
+    cout << "Total time taken: " << timeTaken_seconds << endl;
+    cout << "Mistakes: " << textObj.UserInputMistakeCount() << endl; 
+    cout << "WPM: " << wpm << endl;
+
+    double score = wpm - ( textObj.UserInputMistakeCount() * 0.05 * wpm);
+
+    cout << "Score: " << score << endl;
+
+
+    return;
+}
+
+int getPlayerCount()
+{
+    string file_name = Files::game_control;
+
+    std::ifstream file(file_name);
+    if (file.is_open())
+    {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        int playerCount = stoi(buffer.str());
+        file.close();
+
+        return playerCount;
+    }
+    else
+    {
+        int defaultPlayerCount = 6;
+        return defaultPlayerCount;
+    }
+}
+
 int main( int argc,      // Number of strings in array argv
           char *argv[],   // Array of command-line argument strings
           char *envp[] )  // Array of environment variable strings
 {
 
-
-    Game game;
-    Colours colour;
-    CursorPosition position;
     Text textObj;
 
-    
-    textObj.playerName = argv[1] ;
+    textObj.text = ReadInputFile();
+
+    textObj.playerName = argv[1];
     textObj.date = argv[2];
     textObj.playerNumber = argv[3];
+    int int_playerNumber = stoi(textObj.playerNumber);
+    int width = textObj.text.size() + 2;
 
-    // seperate output files for each player
-    Files::outputFile = ".game_files/output_" + textObj.playerNumber;
-
-    position.line_pos = 0;
+    // used for line spacing of the typed text
+    playerCount = getPlayerCount();
     
-    //OVERLAP TEXT - change 1 - we also need to fix deletes
-    
-    // save the position of the typed row
-    position.typedRow = position.row;
+    Files::outputFile =".game_files/output_files/output_"+textObj.playerNumber;
 
-    // print game text from input file
-    textObj.text = ReadInputFile();
-    textObj.print_text();
-  
-    position.toTypeRowEnd(-1);
-  
-    //position.newline(2);
+    system("clear");
+
+    const int interval0 = 100;  // 0.75 second    
+
+    terminateFlag=true; // allow while loops 
    
-
-
-    // ----------MAIN -----------
-    // start timer at t1
-    auto t1 = high_resolution_clock::now();
-
-    // Main game loop
-    textObj.userInput = detectKeyPress(game, position, textObj);
-    
-    // stop timer at t2
-    auto t2 = high_resolution_clock::now();
-
-    // --------------------------
-
-
-    // getting number of milliseconds as an integer between t2 and t1    
-    auto ms_int = duration_cast<milliseconds>(t2 - t1);  
-    double timeTaken_seconds = (double)ms_int.count()/1000;
-
-    double wpm = CalculateWordsPerMinuite(textObj.size(), timeTaken_seconds); 
-
-    position.newline(2);
-    cout << colour.italic_grey << "GAME OVER." << colour.reset << endl;
+    thread thread1;
+    if (playerCount > 1)
+    {
+        thread thread1(displayTextThread, int_playerNumber, interval0, width); 
+    thread thread2(mainGameThread);
+    // Wait for threads to finish    
+    thread1.join();    
+    thread2.join();
+    }
+    else    
+    {
+        thread thread1(printSpeed, interval0, width);
+        thread thread2(mainGameThread);
+        // Wait for threads to finish    
+        thread1.join();    
+        thread2.join();
+    }
 
 
 
-    std::ofstream myfile;
-    myfile.open(Files::scores, std::ios::app);
-    myfile << textObj.playerName << "," << textObj.date << "," << wpm << "," << timeTaken_seconds << "," << textObj.UserInputMistakeCount() << endl;;
-    myfile.close();
+    cout << endl << endl;
 
-    /*
-    cout << "Name: " << textObj.playerName << endl;
-    cout << "Date: " << textObj.date << endl;
-    cout << "Mistakes: " << textObj.UserInputMistakeCount() << endl; 
 
-    cout << "Time taken: " << timeTaken_seconds  << "s" << endl;
- 
-    cout << "WPM: " << wpm << endl;
-    */
 
-  return 0;
+    return 0;
 }
+
+
+
