@@ -1,15 +1,44 @@
 #!/bin/bash
 game_files=".game_files"
-player_file="${game_files}/player_names.txt"
+player_directory=".players"
+player_names="${game_files}/player_names.txt"
 scores_file="${game_files}/scores.csv"
 game_text_file="${game_files}/game_text.txt"
-
+gameInProgress="${game_files}/inProgress"
+game_control_file="${game_files}/game_control"
+game_count="${game_files}/game_count"
 
 
 # create all neccessary files if they don't exist
 [[ -d $game_files ]] || mkdir $game_files
-[[ -f $player_file ]] || touch $player_file
+[[ -d $player_directory ]] || mkdir $player_directory
+[[ -f $player_names ]] || touch $player_names
 [[ -f $scores_file ]] || touch $scores_file
+[[ -f $gameInProgress ]] || echo false > $gameInProgress
+[[ -f $game_control_file ]] || echo 0 > $game_control_file
+[[ -f $game_count ]] || echo 0 > $game_count
+
+# do not run this script if a game is in progress - it'll fuck everything up
+if grep -q 'true' $gameInProgress; then
+    echo "There is currently a game in progress. Please wait for it to finish"
+    exit
+fi
+
+countdown()    
+{    
+    echo Game Starting in...        
+    count=3    
+    while [[ $count > 0 ]]; do    
+        echo $count        
+        ((count--))    
+        sleep 0.5    
+    done    
+}  
+
+
+
+
+
 
 # get player ip so they don't have to enter a name each time they play
 ip_regex='^.*\((.*)\)$'
@@ -17,14 +46,14 @@ whomst=$(who am i)
 #[[ -z $whomst ]] && whomst=
 [[ $whomst =~ $ip_regex ]] && ip=${BASH_REMATCH[1]} || ip='not found'
 
-# if the player doesn't exist in the player_file ask for a name
-name=$(grep "$ip" $player_file | awk -F ',' '{print $1}')
+# if the player doesn't exist in the player names file ask for a name
+name=$(grep "$ip" $player_names | awk -F ',' '{print $1}')
 
 [[ -z $1 ]] || name="$1"
 
 if [[ -z $name ]]; then
     read -p "What's your name? " name 
-    echo ${name}, ${ip} >> $player_file
+    echo ${name}, ${ip} >> $player_names
 else
     echo "Welcome back $name"
 fi
@@ -55,23 +84,77 @@ echo ${strings2[$random_index]} > $game_text_file
 
 
 
-: '
+#./start_game.sh "$name"
 
-read -p "Hit the enter key when you are ready to start"
 
-echo Game Starting in...
-count=3
-while [[ $count > 0 ]]; do
-    echo $count
-    ((count--))
-    sleep 0.5
+if [[ -n "$(\ls -A $player_directory)" ]]; then    
+    # file exists in the directory     
+    # increment from the last player number    
+    
+    last_file=$(\ls $player_directory/player_[0-9]* 2> /dev/null | tail -1)    
+    
+    ## BUG - ^ the ls command above doesn't order the files correctly so player_9 will always show as the last    
+    
+    file_name_regex='.*_([0-9]*)'    
+    [[ $last_file =~ $file_name_regex ]] && num=${BASH_REMATCH[1]}    
+    
+    ((num++))    
+    
+else    
+    num=1    
+    gameCounter=$(cat $game_count)
+    ((gameCounter++))
+    $gameCounter > $game_count
+    echo Game_ID:$gameCounter >> $scores_file
+fi 
+
+
+
+player_file="$player_directory/player_${num}"
+
+printf "false, $name" > $player_file # its important this file has no newline character
+
+./game_control.exe "$name" "$num"
+
+echo true > $gameInProgress
+
+# when each player exits the game control script they will
+# A) set set gameInProgress = true
+# B) increment the number in the game_control file
+# once the number hits the total number of players the game will begin
+
+players=$(grep -l 'true, ' .players/* | wc -l)
+
+game_control_num=$(cat $game_control_file)
+
+((game_control_num++))
+
+echo $game_control_num > $game_control_file
+
+while [[ "$(cat $game_control_file)" -le "$number_of_players" ]]; do
+    continue
 done
 
-clear
-'
+countdown
 
-cd pre-game
-./start_game.sh "$name"
+ ./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')" "$num"
 
-# ./game_loop.exe "$name" "$(date -u '+%Y-%m-%d %H:%M:%S')"
-    
+# post game
+
+printFirst=true
+while [[ ps -ef | grep -v 'grep' | grep -q 'game_loop.exe' ]]; do
+        if $printFirst; then
+            echo Please wait for the current game to finish
+            printFirst=false
+        fi
+        sleep 1
+    done
+
+grep $(cat $game_count)
+
+
+#reset for next game
+echo 0 > $game_control_file
+rm -f $player_directory/player_*   
+echo false > $gameInProgress
+rm -f $game_files/output_files/output_*

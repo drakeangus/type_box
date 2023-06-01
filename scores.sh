@@ -5,7 +5,7 @@ scores="${game_files}/scores.csv"
 
 print_scores()
 {
-    echo "Name,Date,WPM,Total Time,Mistakes"
+    echo "Name,Date,Score,WPM,Total Time,Mistakes"
     cat $scores | sort -k3 -n -r -t ',' 
 }
 

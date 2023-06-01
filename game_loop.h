@@ -44,7 +44,8 @@ namespace Files
     string outputFile; // This needs to be unique per player
     string inputFile = ".game_files/game_text.txt";
     string scores = ".game_files/scores.csv";
-    string game_control = "pre-game/game_control";
+    string game_control = ".game_files/game_control";
+    string player_file = ".players/player_";
 }
 
 

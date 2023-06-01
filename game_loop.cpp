@@ -1,10 +1,50 @@
 #include "game_loop.h"
 
+string speed_emoji, speed_height;
+
+/*
+⠁⠂⠄⡀
+\u2801 ⠁ top
+\u2802 ⠂ middle top
+\u2804 ⠄ middle bottom
+\u2840 ⡀ bottom
+*/
 double CalculateWordsPerMinuite(int numberOfLetters, double seconds)
 {
     double minutes = seconds / 60;
     double words = numberOfLetters / 5;
-    return words / minutes;
+    double wpm = words / minutes;
+
+    if (wpm <= 40)
+    {
+        speed_emoji="🐌";
+    }
+    else if ( 40 < wpm && wpm <= 50) 
+    {
+        speed_emoji="♿";
+    }
+    else if (50 < wpm && wpm <= 60)
+    {
+        speed_emoji="🏃";
+    }
+    else if (60 < wpm && wpm <= 70)
+    {
+        speed_emoji="🚴";
+    }
+    else if (70 < wpm && wpm <= 80)
+    {
+        speed_emoji="🤖";
+    }
+    else if (80 < wpm && wpm <= 90)
+    {
+        speed_emoji="🚀";
+    }
+    else if (90 < wpm)
+    {
+        speed_emoji="⚡";
+    }
+
+    return wpm;
 }
 
 mutex mtx;
@@ -55,9 +95,9 @@ void GetPlayerNameAndTime(Text& textObj)
 string getPlayerName(string number)
 {
 
-    string file_name = "pre-game/.players/player_" + number;
+//string file_name = "pre-game/.players/player_" + number;
 
-    std::ifstream file(file_name);
+    std::ifstream file(Files::player_file + number);
     if (file.is_open())
     {
         std::stringstream buffer;
@@ -138,15 +178,14 @@ void displayTextThread(int playerNumber, int interval, int width)
         vector <string> strings = getOtherPlayerText(playerNumber);    
 
 
-        // TO DO : The box should take a size as an agrument so we can draw it to the correct size
-        // also an improvement here would be to only draw the box once then just print inside
+        // TO DO : 
+        // an improvement here would be to only draw the box once then just print inside
         // use some trickery to check if its the first time drawing the box 
         
         //int width = textObj.text.size() + 2;
         
         box.printToBox(strings, width, colour.blue);    
 
-        // ** 20 is for the row number - need to fix this 
         cout << "\033[" << (playerCount * 2) + 2 + 1 << ";" << character_count + 1  << "H" << flush; // <---------------- flush is used to immediately print to the terminal from the buffer meaning we can move the cursor, then flush        
         lock.unlock();     
 
@@ -158,31 +197,29 @@ return;
 
 vector <string> drawPace(int characterCount, int targetCount)
 {
-    string output_front = "", output_back = "", middle_text="";
+    //string output_front = "", output_back = "", middle_text="";
+    string output_front = "", output_back = "";
 
-    string middle_text_full= "Snail boy";
-    
+    //string middle_text_full= "Snail boy";
+   
+    /*
     for (int i=0; i < characterCount && i < middle_text_full.size(); i++)
     {
         middle_text += middle_text_full[i];
     }
+*/
 
- /*   for (int i=0; i<targetCount - characterCount - middle_text.size(); i++)
-    {
-        output_back +=  ".";
-    }
-    */
-
-    for (int i=middle_text_full.size(); i<characterCount; i++)
+    //for (int i=middle_text_full.size(); i<characterCount; i++)
+    for (int i=1; i<characterCount; i++)
     {
         output_front += "_";
-
     }
-    string output = output_front + middle_text + output_back;
+    //string output = output_front + middle_text + output_back;
+    
+    string output = output_front + speed_emoji; // speed_emoji is a global variable
     return {output};
     
 
-   // return {"~~~~~~~~~~~~~~~~~~~~~~~~~~ Snail Boy" + to_string(characterCount) + " " + to_string(targetCount) + " ............................."};
 }
 
 
@@ -198,7 +235,7 @@ void printSpeed(int interval, int width)
         cout << "\033[" << 0 << ";0H";  // Move the cursor to the specific line    
 
         //counter = to_string(line1_count++);    
-        vector <string> strings = drawPace(character_count, width - 2 );    
+        vector <string> strings = drawPace(character_count, width );    
 
         box.printToBox(strings, width, colour.blue);    
 
@@ -214,7 +251,7 @@ return;
 
 }
 
-string simpleDetectKeyPress(Text& textObj, CursorPosition& position)
+string detectKeyPress(Text& textObj, CursorPosition& position)
 {
 
     Colours colour;
@@ -272,14 +309,23 @@ std::ofstream myfile;
             character_count++; // global variable
             position.line_pos = content.size();
 
+
             if (textObj.text[content.size()-1] == ch) // correct input character
             {
+                if (int_ch == 32) // space character. for this user display types spaces as underscores
+                {
+                    ch = '_';
+                }
                 // perhaps this should be a function of its own
                 // I could move to the correct line and position from it
                 cout << colour.green << ch << colour.reset;
             }
             else  // incorrect input character
             {
+                if (int_ch == 32) // space character. for this user display types spaces as underscores
+                {
+                    ch = '_';
+                }
                 cout << colour.red << ch << colour.reset;
             }
 
@@ -293,6 +339,17 @@ std::ofstream myfile;
 
         position.newline();
         cout << colour.italic_yellow << wpm << colour.reset;
+
+        //bool printKeyChars = true;
+        bool printKeyChars = false;
+
+        if (printKeyChars)
+        {
+            position.newline();
+            printf("\33[2K\r"); // clear the current line
+            cout << colour.italic_grey << int_ch << " : \"" << ch << "\"" << colour.reset;
+        }
+
         position.toTypeRowEnd(character_count);
 
         
@@ -312,11 +369,11 @@ cout << endl << endl;
     return content;
 }
 
-
+Text textObj;
 void mainGameThread()
 {
 
-    Text textObj;
+    //Text textObj;
     CursorPosition position;
     
 
@@ -336,7 +393,7 @@ void mainGameThread()
 
     // start timer at t1
     auto t1 = high_resolution_clock::now();
-    textObj.userInput = simpleDetectKeyPress(textObj, position); 
+    textObj.userInput = detectKeyPress(textObj, position); 
 
    // stop timer at t2    
     auto t2 = high_resolution_clock::now();
@@ -345,22 +402,28 @@ void mainGameThread()
     double timeTaken_seconds = (double)ms_int.count()/1000;    
     
     double wpm = CalculateWordsPerMinuite(textObj.size(), timeTaken_seconds);
+    double score = wpm - ( textObj.UserInputMistakeCount() * 0.05 * wpm);
 
     std::ofstream myfile;    
     myfile.open(Files::scores, std::ios::app);    
-    myfile << textObj.playerName << "," << textObj.date << "," << wpm << "," << timeTaken_seconds << "," << textObj.UserInputMistakeCount() << endl;
+    myfile << textObj.playerName << "," << textObj.date << "," << score << "," << wpm << "," << timeTaken_seconds << "," << textObj.UserInputMistakeCount() << endl;
     myfile.close();
 
     cout << endl;
-    cout << "Name: " << textObj.playerName << endl;
-    cout << "Total time taken: " << timeTaken_seconds << endl;
-    cout << "Mistakes: " << textObj.UserInputMistakeCount() << endl; 
-    cout << "WPM: " << wpm << endl;
 
-    double score = wpm - ( textObj.UserInputMistakeCount() * 0.05 * wpm);
 
-    cout << "Score: " << score << endl;
+    Box box;
+    Colours colour;
+    vector<string> gameStats = {
+        " Name: " + textObj.playerName + " ",
+        " Total time taken: " + to_string(timeTaken_seconds) + " ",
+        " Mistakes: " + to_string(textObj.UserInputMistakeCount()) + " ", 
+        " WPM: " + to_string(wpm) + " ", 
+        " Score: " + to_string(score) + " "};
 
+    box.printToBox(gameStats, 0, colour.yellow);
+
+    cout << endl;
 
     return;
 }
@@ -391,7 +454,7 @@ int main( int argc,      // Number of strings in array argv
           char *envp[] )  // Array of environment variable strings
 {
 
-    Text textObj;
+    //Text textObj;
 
     textObj.text = ReadInputFile();
 
@@ -432,7 +495,6 @@ int main( int argc,      // Number of strings in array argv
 
 
 
-    cout << endl << endl;
 
 
 
