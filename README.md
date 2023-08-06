@@ -7,9 +7,9 @@ Prints up to 10 players progress in real time while you all type the random phra
 
 ![image](https://github.com/drakeangus/type_box/assets/65454619/849a645d-9da6-4dc1-9416-399fb40a3839)
 
-Since we're working in the terminal the main consideration of the code is cursor placement - we can only print to one place at any one time yet we have more than 10 lines of text updating at all at once.
+Since we're working in the terminal the main consideration of the code is cursor placement - we can only print to one place at any one time yet we have more than 10 lines of text updating all at once.
 
-With multithreading, the main game loop is conveniently split into two parts, and with the use of output buffers and flush we can instantly print text to the screen without a jittery cursors jumping around the screen.
+With multithreading, the main game loop is conveniently split into two parts, and with the use of output buffers and flush we can instantly print text to the screen without a jittery cursor jumping around the screen.
 
 The first thread handles printing other players' text and runs on an interval. Every n milliseconds the thread acquires a lock on the cursor, it moves the cursor to the correct terminal coordinates then prints the box containing the player's strings to a buffer along with instructions to move back to the original location. Once this is done we flush the buffer, remove the lock on the cursor, and sleep the thread for a set interval.
 
