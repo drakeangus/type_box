@@ -1,11 +1,10 @@
 # type_box
  The synchronous multiplayer speed typing game in your terminal. 
-
-![image](https://github.com/drakeangus/type_box/assets/65454619/d3f1774c-e832-4251-9341-9bfe15d58143)
+![type_box_img1](https://github.com/drakeangus/type_box/assets/65454619/6bd75ea8-6f05-46db-80eb-f680eb5fa86e)
 
 Prints up to 10 players progress in real time while you all type the random phrase.
 
-![image](https://github.com/drakeangus/type_box/assets/65454619/849a645d-9da6-4dc1-9416-399fb40a3839)
+![type_box_img2](https://github.com/drakeangus/type_box/assets/65454619/577f3fe8-5724-4444-901c-bebf4bcfc9b3)
 
 Since we're working in the terminal the main consideration of the code is cursor placement - we can only print to one place at any one time yet we have more than 10 lines of text updating all at once.
 
